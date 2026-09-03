@@ -1,0 +1,73 @@
+name: Setup YMM4
+description: Downloads the latest YMM4 release and outputs the folder that holds the reference assemblies.
+
+outputs:
+  path:
+    description: Folder containing YukkuriMovieMaker.Plugin.dll
+    value: ${{ steps.locate.outputs.path }}
+  version:
+    description: Release tag of the YMM4 build that was used
+    value: ${{ steps.meta.outputs.tag }}
+
+runs:
+  using: composite
+
+  steps:
+    - name: Resolve latest release
+      id: meta
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $headers = @{
+          "User-Agent"    = "YMM4SoundNotifier-CI"
+          "Authorization" = "Bearer $env:GH_TOKEN"
+        }
+        $release = Invoke-RestMethod -Headers $headers `
+          -Uri "https://api.github.com/repos/manju-summoner/YukkuriMovieMaker4/releases/latest"
+
+        $asset = $release.assets | Where-Object { $_.name -like "*_Lite.zip" } | Select-Object -First 1
+        if (-not $asset) {
+          $asset = $release.assets | Where-Object { $_.name -like "*.zip" } | Select-Object -First 1
+        }
+        if (-not $asset) {
+          throw "No zip asset was found in the latest YMM4 release."
+        }
+
+        Write-Host "YMM4 $($release.tag_name) / $($asset.name)"
+        "tag=$($release.tag_name)" >> $env:GITHUB_OUTPUT
+        "url=$($asset.browser_download_url)" >> $env:GITHUB_OUTPUT
+
+    - name: Restore cached YMM4
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ymm4
+        key: ymm4-${{ runner.os }}-${{ steps.meta.outputs.tag }}
+
+    - name: Download and extract
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri "${{ steps.meta.outputs.url }}" -OutFile "ymm4.zip"
+
+        if (Get-Command 7z -ErrorAction SilentlyContinue) {
+          7z x "ymm4.zip" "-oymm4" -y | Out-Null
+        }
+        else {
+          Expand-Archive -Path "ymm4.zip" -DestinationPath "ymm4" -Force
+        }
+
+        Remove-Item "ymm4.zip"
+
+    - name: Locate reference assemblies
+      id: locate
+      shell: pwsh
+      run: |
+        $dll = Get-ChildItem -Path "ymm4" -Recurse -Filter "YukkuriMovieMaker.Plugin.dll" | Select-Object -First 1
+        if (-not $dll) {
+          throw "YukkuriMovieMaker.Plugin.dll was not found in the extracted YMM4 release."
+        }
+
+        Write-Host "Reference assemblies: $($dll.DirectoryName)"
+        "path=$($dll.DirectoryName)" >> $env:GITHUB_OUTPUT

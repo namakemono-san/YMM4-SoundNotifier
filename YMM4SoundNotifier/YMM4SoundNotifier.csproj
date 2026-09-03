@@ -1,0 +1,77 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <YmmRefDir>$(YMM4_PATH)\</YmmRefDir>
+  </PropertyGroup>
+
+  <Target Name="EnsureYmm4Path" BeforeTargets="ResolveAssemblyReferences"
+          Condition="!Exists('$(YMM4_PATH)\YukkuriMovieMaker.Plugin.dll')">
+    <Error Text="YMM4 のインストールフォルダが見つかりません。環境変数 YMM4_PATH に設定するか、dotnet build -p:YMM4_PATH=&quot;C:\path\to\YukkuriMovieMaker&quot; のように指定してください。（現在の値: '$(YMM4_PATH)'）" />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="YukkuriMovieMaker.Plugin" HintPath="$(YmmRefDir)YukkuriMovieMaker.Plugin.dll" Private="false" ExcludeAssets="runtime" />
+    <Reference Include="YukkuriMovieMaker.Controls" HintPath="$(YmmRefDir)YukkuriMovieMaker.Controls.dll" Private="false" ExcludeAssets="runtime" />
+    <Reference Include="NAudio" HintPath="$(YmmRefDir)NAudio.dll" Private="false" ExcludeAssets="runtime" />
+    <Reference Include="NAudio.Core" HintPath="$(YmmRefDir)NAudio.Core.dll" Private="false" ExcludeAssets="runtime" />
+    <Reference Include="NAudio.WinMM" HintPath="$(YmmRefDir)NAudio.WinMM.dll" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug' And Exists('$(YMM4_PATH)\YukkuriMovieMaker.Plugin.dll')">
+    <DesignTimeAssemblyName Include="AvalonDock;ExtendedNumerics.BigDecimal;ICSharpCode.AvalonEdit;LlmTornado;Microsoft.Extensions.DependencyInjection.Abstractions;Microsoft.Extensions.Logging.Abstractions;Microsoft.Windows.SDK.NET;Microsoft.Xaml.Behaviors;NAudio;NAudio.Core;NAudio.Midi;NAudio.Wasapi;NAudio.WinMM;NCalc.Core;NCalc.Domain;NCalc.Parser;Newtonsoft.Json;Parlot;SharpGen.Runtime;SharpGen.Runtime.COM;SoundTouch.Net;System.Management;System.Numerics.Tensors;System.ServiceProcess.ServiceController;Vortice.DXGI;Vortice.Direct2D1;Vortice.Direct3D11;Vortice.DirectX;Vortice.Mathematics;Vortice.MediaFoundation;WinRT.Runtime;YamlDotNet;YukkuriMovieMaker.Controls;YukkuriMovieMaker.Plugin" />
+    <DesignTimeAssembly Include="@(DesignTimeAssemblyName->'$(YMM4_PATH)\%(Identity).dll')" />
+  </ItemGroup>
+
+  <Target Name="CopyDesignTimeAssemblies" AfterTargets="Build" Condition="'@(DesignTimeAssembly)' != ''">
+    <ItemGroup>
+      <ExistingDesignTimeAssembly Include="@(DesignTimeAssembly)" Condition="Exists('%(DesignTimeAssembly.FullPath)')" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(ExistingDesignTimeAssembly)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          ContinueOnError="WarnAndContinue"
+          Retries="0" />
+  </Target>
+
+  <Target Name="PostBuild" AfterTargets="CopyDesignTimeAssemblies"
+          Condition="'$(CI)' != 'true' And Exists('$(YMM4_PATH)\YukkuriMovieMaker.exe')">
+    <ItemGroup>
+      <BuildArtifacts Include="$(TargetPath)" />
+      <BuildArtifacts Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+      <BuildArtifacts Include="@(ReferenceCopyLocalPaths)" />
+      <DeployDest Include="@(BuildArtifacts->'$(YMM4_PATH)\user\plugin\YMM4SoundNotifier\%(Filename)%(Extension)')" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(BuildArtifacts)"
+          DestinationFiles="@(DeployDest)"
+          SkipUnchangedFiles="true"
+          ContinueOnError="WarnAndContinue"
+          Retries="0" />
+  </Target>
+
+</Project>

@@ -1,0 +1,67 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build_and_release:
+    name: Build and Release
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Setup YMM4
+        id: ymm4
+        uses: ./.github/actions/setup-ymm4
+
+      - name: Resolve version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$($tag.TrimStart('v'))" >> $env:GITHUB_OUTPUT
+
+      - name: Publish
+        shell: pwsh
+        env:
+          CI: "true"
+        run: |
+          dotnet publish YMM4SoundNotifier/YMM4SoundNotifier.csproj `
+            --configuration Release `
+            --output publish `
+            -p:YMM4_PATH="${{ steps.ymm4.outputs.path }}" `
+            -p:Version="${{ steps.version.outputs.version }}"
+
+      - name: Copy README and LICENSE to publish folder
+        shell: pwsh
+        run: |
+          Copy-Item ".github\assets\readme.txt" -Destination "publish\readme.txt"
+          Copy-Item "LICENSE" -Destination "publish\LICENSE"
+
+      - name: Create ZIP and rename to .ymme
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "publish\*" -DestinationPath "YMM4SoundNotifier.zip" -CompressionLevel Optimal
+          Move-Item "YMM4SoundNotifier.zip" "YMM4SoundNotifier.ymme"
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          artifacts: YMM4SoundNotifier.ymme
+          draft: true
+          prerelease: true

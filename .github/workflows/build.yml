@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Setup YMM4
+        id: ymm4
+        uses: ./.github/actions/setup-ymm4
+
+      - name: Build
+        shell: pwsh
+        env:
+          CI: "true"
+        run: dotnet build --configuration Release -p:YMM4_PATH="${{ steps.ymm4.outputs.path }}"
