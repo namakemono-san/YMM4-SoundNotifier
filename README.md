@@ -63,7 +63,7 @@ YMM4の「設定」タブに **YMM4 Sound Notifier** が追加されます。
 
 詳細は [`CONTRIBUTING.md`](CONTRIBUTING.md) を参照してください。
 
-### ビルド
+## ビルド
 
 ```bash
 dotnet build -c Release
